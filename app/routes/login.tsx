@@ -1,5 +1,6 @@
 import type {
   ActionFunction,
+  LinksFunction,
   LoaderFunction,
   MetaFunction,
 } from "@remix-run/node";
@@ -8,8 +9,14 @@ import { Form, Link, useActionData, useSearchParams } from "@remix-run/react";
 import * as React from "react";
 
 import { createUserSession, getUserId } from "~/session.server";
-import { verifyLogin } from "~/models/user.server";
+import { createUser, getUserByEmail, verifyLogin } from "~/models/user.server";
 import { validateEmail } from "~/utils";
+
+import tailwindStylesheetUrl from "~/styles/tailwind.css";
+
+export const links: LinksFunction = () => {
+  return [{ rel: "stylesheet", href: tailwindStylesheetUrl }];
+};
 
 export const loader: LoaderFunction = async ({ request }) => {
   const userId = await getUserId(request);
@@ -26,6 +33,7 @@ interface ActionData {
 
 export const action: ActionFunction = async ({ request }) => {
   const formData = await request.formData();
+  const intent = formData.get("intent");
   const email = formData.get("email");
   const password = formData.get("password");
   const redirectTo = formData.get("redirectTo");
@@ -52,9 +60,26 @@ export const action: ActionFunction = async ({ request }) => {
     );
   }
 
-  const user = await verifyLogin(email, password);
+  let userId: string | undefined;
+  if (intent === "login") {
+    const user = await verifyLogin(email, password);
+    userId = user?.id;
+  } else if (intent === "signup") {
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return json<ActionData>(
+        { errors: { email: "A user already exists with this email" } },
+        { status: 400 }
+      );
+    }
 
-  if (!user) {
+    const user = await createUser(email, password);
+    userId = user.id;
+  } else {
+    throw new Error(`Unknown intent: ${intent}`);
+  }
+
+  if (!userId) {
     return json<ActionData>(
       { errors: { email: "Invalid email or password" } },
       { status: 400 }
@@ -63,9 +88,9 @@ export const action: ActionFunction = async ({ request }) => {
 
   return createUserSession({
     request,
-    userId: user.id,
+    userId,
     remember: remember === "on" ? true : false,
-    redirectTo: typeof redirectTo === "string" ? redirectTo : "/notes",
+    redirectTo: typeof redirectTo === "string" ? redirectTo : "/",
   });
 };
 
@@ -77,7 +102,7 @@ export const meta: MetaFunction = () => {
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/notes";
+  const redirectTo = searchParams.get("redirectTo") || "/";
   const actionData = useActionData() as ActionData;
   const emailRef = React.useRef<HTMLInputElement>(null);
   const passwordRef = React.useRef<HTMLInputElement>(null);
@@ -151,9 +176,19 @@ export default function LoginPage() {
           <input type="hidden" name="redirectTo" value={redirectTo} />
           <button
             type="submit"
-            className="w-full rounded bg-blue-500  py-2 px-4 text-white hover:bg-blue-600 focus:bg-blue-400"
+            name="intent"
+            value="login"
+            className="w-full rounded bg-blue-500 py-2 px-4 text-white hover:bg-blue-600 focus:bg-blue-400"
           >
             Log in
+          </button>
+          <button
+            type="submit"
+            name="intent"
+            value="signup"
+            className="w-full rounded bg-cyan-500 py-2 px-4 text-white hover:bg-cyan-600 focus:bg-cyan-400"
+          >
+            Sign Up
           </button>
           <div className="flex items-center justify-between">
             <div className="flex items-center">
