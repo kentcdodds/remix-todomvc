@@ -12,6 +12,7 @@ import {
   useLoaderData,
   Link,
   useLocation,
+  useFetchers,
 } from "@remix-run/react";
 import { prisma } from "~/db.server";
 import { requireUserId } from "~/session.server";
@@ -19,6 +20,7 @@ import todosStylesheet from "./todos.css";
 import invariant from "tiny-invariant";
 
 type TodoItem = Pick<Todo, "id" | "complete" | "title">;
+type Filter = "all" | "active" | "complete";
 
 type LoaderData = {
   todos: Array<TodoItem>;
@@ -47,7 +49,15 @@ type CreateTodoActionData = {
   error: string;
 };
 
+type UpdateTodoActionData = {
+  title: string;
+  error: string;
+};
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const action: ActionFunction = async ({ request }) => {
+  await sleep(Math.random() * 1000 + 500);
   const formData = await request.formData();
   const userId = await requireUserId(request);
 
@@ -57,12 +67,12 @@ export const action: ActionFunction = async ({ request }) => {
     case "createTodo": {
       const title = formData.get("title");
       invariant(typeof title === "string", "title must be a string");
-      // if (Math.random() > 0.5) {
-      //   return json<CreateTodoActionData>(
-      //     { title, error: "An unknown error occurred" },
-      //     { status: 500 }
-      //   );
-      // }
+      if (title.includes("error")) {
+        return json<CreateTodoActionData>(
+          { title, error: `Todos cannot include the word "error"` },
+          { status: 400 }
+        );
+      }
       const titleError = validateNewTodoTitle(title);
       if (titleError) {
         return json<CreateTodoActionData>(
@@ -109,6 +119,22 @@ export const action: ActionFunction = async ({ request }) => {
       return new Response("ok");
     }
     case "updateTodo": {
+      const title = formData.get("title");
+      invariant(typeof title === "string", "title must be a string");
+      if (title.includes("error")) {
+        return json<UpdateTodoActionData>(
+          { title, error: `Todos cannot include the word "error"` },
+          { status: 400 }
+        );
+      }
+      const titleError = validateNewTodoTitle(title);
+      if (titleError) {
+        return json<UpdateTodoActionData>(
+          { title, error: titleError },
+          { status: 400 }
+        );
+      }
+
       await prisma.todo.update({
         where: { id: todoId },
         data: { title: String(formData.get("title")) },
@@ -125,13 +151,18 @@ export const action: ActionFunction = async ({ request }) => {
   }
 };
 
-const generateRandomId = () => Math.random().toString(32).slice(2);
-
 interface CreateTodoFormElements extends HTMLFormControlsCollection {
   title?: HTMLInputElement;
 }
 interface CreateTodoForm extends HTMLFormElement {
   readonly elements: CreateTodoFormElements;
+}
+
+interface UpdateTodoFormElements extends HTMLFormControlsCollection {
+  title?: HTMLInputElement;
+}
+interface UpdateTodoForm extends HTMLFormElement {
+  readonly elements: UpdateTodoFormElements;
 }
 
 export default function TodosRoute() {
@@ -142,54 +173,98 @@ export default function TodosRoute() {
   const createFormRef = React.useRef<HTMLFormElement>(null);
   const location = useLocation();
 
-  const todos = [...data.todos];
+  let optimisticTodos = [...data.todos];
 
   const createFetcherData = createFetcher.data as
     | CreateTodoActionData
     | undefined;
 
-  if (createFetcher.submission && !createFetcherData?.error) {
+  let optimisticNewTodo: TodoItem | undefined;
+
+  if (
+    createFetcher.submission &&
+    (createFetcher.state === "submitting" ||
+      (!createFetcherData?.error && createFetcher.state === "loading"))
+  ) {
     const newTodoTitle = createFetcher.submission.formData.get("title");
     if (
       typeof newTodoTitle === "string" &&
       !validateNewTodoTitle(newTodoTitle)
     ) {
-      todos.push({
-        id: generateRandomId(),
+      optimisticNewTodo = {
+        id: "new",
         title: newTodoTitle,
         complete: false,
-      });
+      };
+      optimisticTodos.push(optimisticNewTodo);
     }
   }
 
-  if (clearFetcher.submission) {
-    // TODO: clear fetcher
-    // todos = todos.filter
+  if (clearFetcher.submission && !clearFetcher.data?.error) {
+    optimisticTodos = optimisticTodos.filter((todo) => !todo.complete);
+  }
+
+  let togglingComplete: boolean | undefined;
+  if (toggleAllFetcher.submission && !toggleAllFetcher.data?.error) {
+    togglingComplete =
+      toggleAllFetcher.submission.formData.get("complete") === "true";
+    optimisticTodos = optimisticTodos.map((todo) => ({
+      ...todo,
+      complete: togglingComplete as boolean,
+    }));
+  }
+
+  const allFetchers = useFetchers();
+  const deleteFetchers = allFetchers.filter(
+    (f) => f.submission?.formData.get("intent") === "deleteTodo"
+  );
+  const toggleFetchers = allFetchers.filter(
+    (f) => f.submission?.formData.get("intent") === "toggleTodo"
+  );
+
+  for (const fetcher of deleteFetchers) {
+    optimisticTodos = optimisticTodos.filter(
+      (todo) => todo.id !== fetcher.submission?.formData.get("todoId")
+    );
+  }
+
+  for (const fetcher of toggleFetchers) {
+    optimisticTodos = optimisticTodos.map((todo) => {
+      if (todo.id === fetcher.submission?.formData.get("todoId")) {
+        return {
+          ...todo,
+          complete: fetcher.submission?.formData.get("complete") === "true",
+        };
+      }
+      return todo;
+    });
   }
 
   React.useEffect(() => {
     const formEl = createFormRef.current as CreateTodoForm | undefined;
     if (!formEl) return;
-    if (createFetcher.type === "actionSubmission") {
+    if (createFetcher.state === "submitting") {
       formEl.reset();
-    } else if (createFetcher.type === "actionReload") {
+    } else if (createFetcher.state === "loading") {
       if (createFetcherData?.error && formEl.elements.title) {
         formEl.elements.title.value = createFetcherData.title;
+        formEl.elements.title.focus();
       }
     }
-  }, [createFetcher.submission?.key, createFetcher.type, createFetcherData]);
+  }, [createFetcher.submission?.key, createFetcher.state, createFetcherData]);
 
-  const hasCompleteTodos = data.todos.some((todo) => todo.complete === true);
+  const hasCompleteTodos = optimisticTodos.some(
+    (todo) => todo.complete === true
+  );
 
-  const filter: "all" | "active" | "complete" = location.pathname.endsWith(
-    "/complete"
-  )
+  const filter: Filter = location.pathname.endsWith("/complete")
     ? "complete"
     : location.pathname.endsWith("/active")
     ? "active"
     : "all";
 
-  const allComplete = data.todos.every((t) => t.complete);
+  const remainingActive = optimisticTodos.filter((t) => !t.complete);
+  const allComplete = remainingActive.length === 0;
 
   return (
     <>
@@ -210,11 +285,11 @@ export default function TodosRoute() {
                 aria-invalid={createFetcherData?.error ? true : undefined}
                 aria-describedby="new-todo-error"
               />
-              {createFetcherData?.error && (
+              {createFetcherData?.error && !optimisticNewTodo ? (
                 <div className="error" id="new-todo-error">
                   {createFetcherData?.error}
                 </div>
-              )}
+              ) : null}
             </createFetcher.Form>
           </header>
           <section className="main">
@@ -239,21 +314,30 @@ export default function TodosRoute() {
               </button>
             </toggleAllFetcher.Form>
             <ul className="todo-list">
-              {todos
-                .filter(
-                  (todo) =>
-                    filter === "all" ||
-                    (filter === "complete" ? todo.complete : !todo.complete)
-                )
-                .map((todo) => (
-                  <ListItem todo={todo} key={todo.id} />
-                ))}
+              {data.todos.map((todo) => (
+                <ListItem
+                  todo={todo}
+                  key={todo.id}
+                  filter={filter}
+                  togglingComplete={togglingComplete}
+                />
+              ))}
+              {optimisticNewTodo ? (
+                <ListItem
+                  todo={optimisticNewTodo}
+                  filter={filter}
+                  togglingComplete={togglingComplete}
+                />
+              ) : null}
             </ul>
           </section>
           <footer className="footer">
             <span className="todo-count">
-              <strong>{todos.length}</strong>
-              <span> items left</span>
+              <strong>{remainingActive.length}</strong>
+              <span>
+                {" "}
+                {remainingActive.length === 1 ? "item" : "items"} left
+              </span>
             </span>
             <ul className="filters">
               <li>
@@ -305,46 +389,87 @@ export default function TodosRoute() {
 
 const cn = (...cns: Array<string | false>) => cns.filter(Boolean).join(" ");
 
-function ListItem({ todo }: { todo: TodoItem }) {
+function ListItem({
+  todo,
+  filter,
+  togglingComplete,
+}: {
+  todo: TodoItem;
+  filter: Filter;
+  togglingComplete?: boolean;
+}) {
   const updateFetcher = useFetcher();
   const toggleFetcher = useFetcher();
   const deleteFetcher = useFetcher();
-  const inputRef = React.useRef<HTMLInputElement>(null);
+  const updateFormRef = React.useRef<HTMLFormElement>(null);
+
+  const isDeleting = Boolean(deleteFetcher.submission);
+  const isToggling = Boolean(toggleFetcher.submission);
+
+  const optimisticComplete = isToggling
+    ? !todo.complete
+    : typeof togglingComplete === "boolean"
+    ? togglingComplete
+    : todo.complete;
+
+  const shouldRender =
+    filter === "all" ||
+    (filter === "complete" && optimisticComplete) ||
+    (filter === "active" && !optimisticComplete);
+
+  if (isDeleting || !shouldRender) return null;
 
   return (
-    <li className={todo.complete ? "completed" : ""}>
+    <li className={optimisticComplete ? "completed" : ""}>
       <div className="view">
         <toggleFetcher.Form method="post">
           <input type="hidden" name="todoId" value={todo.id} />
           <input
             type="hidden"
             name="complete"
-            value={(!todo.complete).toString()}
+            value={(!optimisticComplete).toString()}
           />
           <button
             type="submit"
             name="intent"
             value="toggleTodo"
             className="toggle"
-            title={todo.complete ? "Mark as incomplete" : "Mark as complete"}
+            disabled={todo.id === "new"}
+            title={
+              optimisticComplete ? "Mark as incomplete" : "Mark as complete"
+            }
           >
-            {todo.complete ? <CompleteIcon /> : <IncompleteIcon />}
+            {optimisticComplete ? <CompleteIcon /> : <IncompleteIcon />}
           </button>
         </toggleFetcher.Form>
-        <updateFetcher.Form method="post">
+        <updateFetcher.Form
+          method="post"
+          className="update-form"
+          ref={updateFormRef}
+        >
           <input type="hidden" name="intent" value="updateTodo" />
           <input type="hidden" name="todoId" value={todo.id} />
           <input
-            ref={inputRef}
             name="title"
             className="edit-input"
             defaultValue={todo.title}
+            disabled={todo.id === "new"}
             onBlur={(e) => {
               if (todo.title !== e.currentTarget.value) {
                 updateFetcher.submit(e.currentTarget.form);
               }
             }}
+            aria-invalid={updateFetcher.data?.error ? true : undefined}
+            aria-describedby={`todo-update-error-${todo.id}`}
           />
+          {updateFetcher.data?.error && updateFetcher.state !== "submitting" ? (
+            <div
+              className="error todo-update-error"
+              id={`todo-update-error-${todo.id}`}
+            >
+              {updateFetcher.data?.error}
+            </div>
+          ) : null}
         </updateFetcher.Form>
         <deleteFetcher.Form method="post">
           <input type="hidden" name="todoId" value={todo.id} />
@@ -354,6 +479,7 @@ function ListItem({ todo }: { todo: TodoItem }) {
             type="submit"
             name="intent"
             value="deleteTodo"
+            disabled={todo.id === "new"}
           />
         </deleteFetcher.Form>
       </div>

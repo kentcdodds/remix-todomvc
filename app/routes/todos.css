@@ -342,3 +342,13 @@ html .clear-completed:active {
   right: 4px;
   bottom: 4px;
 }
+
+.update-form {
+  position: relative;
+}
+.todo-update-error {
+  font-size: 14px;
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+}
