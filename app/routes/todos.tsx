@@ -127,6 +127,13 @@ export const action: ActionFunction = async ({ request }) => {
 
 const generateRandomId = () => Math.random().toString(32).slice(2);
 
+interface CreateTodoFormElements extends HTMLFormControlsCollection {
+  title?: HTMLInputElement;
+}
+interface CreateTodoForm extends HTMLFormElement {
+  readonly elements: CreateTodoFormElements;
+}
+
 export default function TodosRoute() {
   const data = useLoaderData() as LoaderData;
   const createFetcher = useFetcher();
@@ -161,12 +168,13 @@ export default function TodosRoute() {
   }
 
   React.useEffect(() => {
-    if (!createFormRef.current) return;
+    const formEl = createFormRef.current as CreateTodoForm | undefined;
+    if (!formEl) return;
     if (createFetcher.type === "actionSubmission") {
-      createFormRef.current.reset();
+      formEl.reset();
     } else if (createFetcher.type === "actionReload") {
-      if (createFetcherData?.error) {
-        createFormRef.current.elements.title.value = createFetcherData.title;
+      if (createFetcherData?.error && formEl.elements.title) {
+        formEl.elements.title.value = createFetcherData.title;
       }
     }
   }, [createFetcher.submission?.key, createFetcher.type, createFetcherData]);
