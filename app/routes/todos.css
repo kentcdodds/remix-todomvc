@@ -70,7 +70,6 @@ body {
 }
 
 .new-todo,
-.todo-input,
 .edit-input {
   position: relative;
   margin: 0;
@@ -328,4 +327,18 @@ html .clear-completed:active {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
+}
+
+.error {
+  color: rgb(185, 28, 28);
+}
+
+.create-form {
+  position: relative;
+}
+
+#new-todo-error {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
 }

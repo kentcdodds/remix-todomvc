@@ -16,9 +16,12 @@ import {
 import { prisma } from "~/db.server";
 import { requireUserId } from "~/session.server";
 import todosStylesheet from "./todos.css";
+import invariant from "tiny-invariant";
+
+type TodoItem = Pick<Todo, "id" | "complete" | "title">;
 
 type LoaderData = {
-  todos: Array<Todo>;
+  todos: Array<TodoItem>;
 };
 
 export const links: LinksFunction = () => {
@@ -30,8 +33,18 @@ export const loader: LoaderFunction = async ({ request }) => {
   return json<LoaderData>({
     todos: await prisma.todo.findMany({
       where: { userId },
+      select: { id: true, complete: true, title: true },
     }),
   });
+};
+
+function validateNewTodoTitle(title: string) {
+  return title ? null : "Todo title required";
+}
+
+type CreateTodoActionData = {
+  title: string;
+  error: string;
 };
 
 export const action: ActionFunction = async ({ request }) => {
@@ -42,10 +55,25 @@ export const action: ActionFunction = async ({ request }) => {
 
   switch (intent) {
     case "createTodo": {
+      const title = formData.get("title");
+      invariant(typeof title === "string", "title must be a string");
+      // if (Math.random() > 0.5) {
+      //   return json<CreateTodoActionData>(
+      //     { title, error: "An unknown error occurred" },
+      //     { status: 500 }
+      //   );
+      // }
+      const titleError = validateNewTodoTitle(title);
+      if (titleError) {
+        return json<CreateTodoActionData>(
+          { title, error: titleError },
+          { status: 400 }
+        );
+      }
       await prisma.todo.create({
         data: {
           complete: false,
-          title: String(formData.get("title")),
+          title: String(title),
           userId,
         },
       });
@@ -97,6 +125,8 @@ export const action: ActionFunction = async ({ request }) => {
   }
 };
 
+const generateRandomId = () => Math.random().toString(32).slice(2);
+
 export default function TodosRoute() {
   const data = useLoaderData() as LoaderData;
   const createFetcher = useFetcher();
@@ -105,12 +135,41 @@ export default function TodosRoute() {
   const createFormRef = React.useRef<HTMLFormElement>(null);
   const location = useLocation();
 
-  const createDone = createFetcher.type === "done";
-  React.useEffect(() => {
-    if (createDone && createFormRef.current) {
-      createFormRef.current.reset();
+  const todos = [...data.todos];
+
+  const createFetcherData = createFetcher.data as
+    | CreateTodoActionData
+    | undefined;
+
+  if (createFetcher.submission && !createFetcherData?.error) {
+    const newTodoTitle = createFetcher.submission.formData.get("title");
+    if (
+      typeof newTodoTitle === "string" &&
+      !validateNewTodoTitle(newTodoTitle)
+    ) {
+      todos.push({
+        id: generateRandomId(),
+        title: newTodoTitle,
+        complete: false,
+      });
     }
-  }, [createDone]);
+  }
+
+  if (clearFetcher.submission) {
+    // TODO: clear fetcher
+    // todos = todos.filter
+  }
+
+  React.useEffect(() => {
+    if (!createFormRef.current) return;
+    if (createFetcher.type === "actionSubmission") {
+      createFormRef.current.reset();
+    } else if (createFetcher.type === "actionReload") {
+      if (createFetcherData?.error) {
+        createFormRef.current.elements.title.value = createFetcherData.title;
+      }
+    }
+  }, [createFetcher.submission?.key, createFetcher.type, createFetcherData]);
 
   const hasCompleteTodos = data.todos.some((todo) => todo.complete === true);
 
@@ -130,13 +189,24 @@ export default function TodosRoute() {
         <div>
           <header className="header">
             <h1>todos</h1>
-            <createFetcher.Form ref={createFormRef} method="post">
+            <createFetcher.Form
+              ref={createFormRef}
+              method="post"
+              className="create-form"
+            >
               <input type="hidden" name="intent" value="createTodo" />
               <input
-                className="todo-input new-todo"
+                className="new-todo"
                 placeholder="What needs to be done?"
                 name="title"
+                aria-invalid={createFetcherData?.error ? true : undefined}
+                aria-describedby="new-todo-error"
               />
+              {createFetcherData?.error && (
+                <div className="error" id="new-todo-error">
+                  {createFetcherData?.error}
+                </div>
+              )}
             </createFetcher.Form>
           </header>
           <section className="main">
@@ -151,12 +221,17 @@ export default function TodosRoute() {
                 type="submit"
                 name="intent"
                 value="toggleAllTodos"
+                title={
+                  allComplete
+                    ? "Mark all as incomplete"
+                    : "Mark all as complete"
+                }
               >
                 ❯
               </button>
             </toggleAllFetcher.Form>
             <ul className="todo-list">
-              {data.todos
+              {todos
                 .filter(
                   (todo) =>
                     filter === "all" ||
@@ -169,7 +244,7 @@ export default function TodosRoute() {
           </section>
           <footer className="footer">
             <span className="todo-count">
-              <strong>{data.todos.length}</strong>
+              <strong>{todos.length}</strong>
               <span> items left</span>
             </span>
             <ul className="filters">
@@ -222,7 +297,7 @@ export default function TodosRoute() {
 
 const cn = (...cns: Array<string | false>) => cns.filter(Boolean).join(" ");
 
-function ListItem({ todo }: { todo: Todo }) {
+function ListItem({ todo }: { todo: TodoItem }) {
   const updateFetcher = useFetcher();
   const toggleFetcher = useFetcher();
   const deleteFetcher = useFetcher();
