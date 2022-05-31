@@ -122,6 +122,8 @@ export default function TodosRoute() {
     ? "active"
     : "all";
 
+  const allComplete = data.todos.every((t) => t.complete);
+
   return (
     <>
       <section className="todoapp">
@@ -131,29 +133,28 @@ export default function TodosRoute() {
             <createFetcher.Form ref={createFormRef} method="post">
               <input type="hidden" name="intent" value="createTodo" />
               <input
-                className="new-todo"
+                className="todo-input new-todo"
                 placeholder="What needs to be done?"
                 name="title"
               />
             </createFetcher.Form>
           </header>
           <section className="main">
-            <input
-              id="toggle-all"
-              className="toggle-all"
-              type="checkbox"
-              checked={data.todos.every((t) => t.complete)}
-              onChange={(event) =>
-                toggleAllFetcher.submit(
-                  {
-                    intent: "toggleAllTodos",
-                    complete: String(event.currentTarget.checked),
-                  },
-                  { method: "post" }
-                )
-              }
-            />
-            <label htmlFor="toggle-all"></label>
+            <toggleAllFetcher.Form method="post">
+              <input
+                type="hidden"
+                name="complete"
+                value={(!allComplete).toString()}
+              />
+              <button
+                className={`toggle-all ${allComplete ? "checked" : ""}`}
+                type="submit"
+                name="intent"
+                value="toggleAllTodos"
+              >
+                ❯
+              </button>
+            </toggleAllFetcher.Form>
             <ul className="todo-list">
               {data.todos
                 .filter(
@@ -208,7 +209,6 @@ export default function TodosRoute() {
         </div>
       </section>
       <footer className="info">
-        <p>Double-click to edit a todo</p>
         <p>
           Created by <a href="http://github.com/kentcdodds">Kent C. Dodds</a>
         </p>
@@ -227,67 +227,95 @@ function ListItem({ todo }: { todo: Todo }) {
   const toggleFetcher = useFetcher();
   const deleteFetcher = useFetcher();
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const [isEditing, setIsEditing] = React.useState(false);
-
-  const toggleEditing = () => setIsEditing((is) => !is);
-  function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Enter" || event.key === "Escape") {
-      setIsEditing(false);
-    }
-  }
 
   return (
-    <li className={cn(todo.complete && "complete", isEditing && "editing")}>
+    <li className={todo.complete ? "completed" : ""}>
       <div className="view">
-        <input
-          className="toggle"
-          type="checkbox"
-          checked={todo.complete}
-          onChange={(event) =>
-            toggleFetcher.submit(
-              {
-                intent: "toggleTodo",
-                todoId: todo.id,
-                complete: String(event.currentTarget.checked),
-              },
-              { method: "post" }
-            )
-          }
-        />
-        <label
-          onDoubleClick={() => {
-            toggleEditing();
-            requestAnimationFrame(() => {
-              if (!inputRef.current) return;
-              inputRef.current.focus();
-              inputRef.current.setSelectionRange(
-                inputRef.current.value.length,
-                inputRef.current.value.length
-              );
-            });
-          }}
-        >
-          {todo.title}
-        </label>
-        <deleteFetcher.Form method="post">
-          <input type="hidden" name="intent" value="deleteTodo" />
+        <toggleFetcher.Form method="post">
           <input type="hidden" name="todoId" value={todo.id} />
-          <button className="destroy"></button>
+          <input
+            type="hidden"
+            name="complete"
+            value={(!todo.complete).toString()}
+          />
+          <button
+            type="submit"
+            name="intent"
+            value="toggleTodo"
+            className="toggle"
+            title={todo.complete ? "Mark as incomplete" : "Mark as complete"}
+          >
+            {todo.complete ? <CompleteIcon /> : <IncompleteIcon />}
+          </button>
+        </toggleFetcher.Form>
+        <updateFetcher.Form method="post">
+          <input type="hidden" name="intent" value="updateTodo" />
+          <input type="hidden" name="todoId" value={todo.id} />
+          <input
+            ref={inputRef}
+            name="title"
+            className="edit-input"
+            defaultValue={todo.title}
+            onBlur={(e) => {
+              if (todo.title !== e.currentTarget.value) {
+                updateFetcher.submit(e.currentTarget.form);
+              }
+            }}
+          />
+        </updateFetcher.Form>
+        <deleteFetcher.Form method="post">
+          <input type="hidden" name="todoId" value={todo.id} />
+          <button
+            className="destroy"
+            title="Delete todo"
+            type="submit"
+            name="intent"
+            value="deleteTodo"
+          />
         </deleteFetcher.Form>
       </div>
-      <updateFetcher.Form method="post">
-        <input type="hidden" name="intent" value="updateTodo" />
-        <input type="hidden" name="todoId" value={todo.id} />
-        <input
-          ref={inputRef}
-          className="edit"
-          name="title"
-          defaultValue={todo.title}
-          onKeyDown={handleKeyDown}
-          onBlur={toggleEditing}
-        />
-      </updateFetcher.Form>
     </li>
+  );
+}
+
+function IncompleteIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="40"
+      height="40"
+      viewBox="-3 -3 105 105"
+    >
+      <circle
+        cx="50"
+        cy="50"
+        r="50"
+        fill="none"
+        stroke="#ededed"
+        strokeWidth="3"
+      />
+    </svg>
+  );
+}
+
+function CompleteIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="40"
+      height="40"
+      viewBox="-3 -3 105 105"
+    >
+      <circle
+        cx="50"
+        cy="50"
+        r="50"
+        fill="none"
+        stroke="#bddad5"
+        strokeWidth="3"
+      />
+      <path fill="#5dc2af" d="M72 25L42 71 27 56l-4 4 20 20 34-52z" />
+    </svg>
   );
 }
 
