@@ -331,7 +331,6 @@ function ListItem({ todo, filter }: { todo: TodoItem; filter: Filter }) {
             name="intent"
             value="toggleTodo"
             className="toggle"
-            disabled={todo.id === "new"}
             title={todo.complete ? "Mark as incomplete" : "Mark as complete"}
           >
             {todo.complete ? <CompleteIcon /> : <IncompleteIcon />}
@@ -348,7 +347,6 @@ function ListItem({ todo, filter }: { todo: TodoItem; filter: Filter }) {
             name="title"
             className="edit-input"
             defaultValue={todo.title}
-            disabled={todo.id === "new"}
             onBlur={(e) => {
               if (todo.title !== e.currentTarget.value) {
                 updateFetcher.submit(e.currentTarget.form);
@@ -374,7 +372,6 @@ function ListItem({ todo, filter }: { todo: TodoItem; filter: Filter }) {
             type="submit"
             name="intent"
             value="deleteTodo"
-            disabled={todo.id === "new"}
           />
         </deleteFetcher.Form>
       </div>
