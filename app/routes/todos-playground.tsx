@@ -57,7 +57,7 @@ type UpdateTodoActionData = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const action: ActionFunction = async ({ request }) => {
-  await sleep(Math.random() * 1000 + 500);
+  // await sleep(Math.random() * 1000 + 500);
   const formData = await request.formData();
   const userId = await requireUserId(request);
 
