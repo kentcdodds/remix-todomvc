@@ -309,10 +309,7 @@ function ListItem({ todo, filter }: { todo: TodoItem; filter: Filter }) {
   const deleteFetcher = useFetcher();
   const updateFormRef = React.useRef<HTMLFormElement>(null);
 
-  const isToggling = Boolean(toggleFetcher.submission);
-  const complete = isToggling
-    ? toggleFetcher.submission?.formData.get("complete") === "true"
-    : todo.complete;
+  const complete = todo.complete;
 
   const shouldRender =
     filter === "all" ||
