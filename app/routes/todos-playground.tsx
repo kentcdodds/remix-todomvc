@@ -257,7 +257,11 @@ export default function TodosRoute() {
             </span>
             <ul className="filters">
               <li>
-                <Link to="." className={cn(filter === "all" && "selected")}>
+                <Link
+                  to="."
+                  className={cn(filter === "all" && "selected")}
+                  prefetch="render"
+                >
                   All
                 </Link>
               </li>{" "}
@@ -265,6 +269,7 @@ export default function TodosRoute() {
                 <Link
                   to="active"
                   className={cn(filter === "active" && "selected")}
+                  prefetch="render"
                 >
                   Active
                 </Link>
@@ -273,6 +278,7 @@ export default function TodosRoute() {
                 <Link
                   to="complete"
                   className={cn(filter === "complete" && "selected")}
+                  prefetch="render"
                 >
                   Completed
                 </Link>
