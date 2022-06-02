@@ -58,7 +58,6 @@ function validateCreatedAt(createdAt: string) {
 
 type CreateTodoActionData = {
   id: string;
-  title: string;
   error: string;
 };
 
@@ -89,7 +88,7 @@ export const action: ActionFunction = async ({ request }) => {
       // }
       if (title.includes("error")) {
         return json<CreateTodoActionData>(
-          { id, title, error: `Todos cannot include the word "error"` },
+          { id, error: `Todos cannot include the word "error"` },
           { status: 400 }
         );
       }
@@ -104,7 +103,7 @@ export const action: ActionFunction = async ({ request }) => {
       const titleError = validateNewTodoTitle(title);
       if (titleError) {
         return json<CreateTodoActionData>(
-          { id, title, error: titleError },
+          { id, error: titleError },
           { status: 400 }
         );
       }
@@ -179,7 +178,7 @@ export const action: ActionFunction = async ({ request }) => {
 
       await prisma.todo.update({
         where: { id: todoId },
-        data: { title: String(formData.get("title")) },
+        data: { title },
       });
       return new Response(null);
     }
@@ -303,7 +302,8 @@ export default function TodosRoute() {
     const id = fetcher.submission?.formData.get("id");
     const createdAt = fetcher.submission?.formData.get("createdAt");
     if (
-      todos.every((t) => t.id !== id) && // it's not already finished
+      // it's already finished
+      todos.every((t) => t.id !== id) &&
       // the ID is valid
       typeof id === "string" &&
       !validateId(id) &&
