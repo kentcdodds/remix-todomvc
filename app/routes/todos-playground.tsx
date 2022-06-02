@@ -309,31 +309,32 @@ function ListItem({ todo, filter }: { todo: TodoItem; filter: Filter }) {
   const deleteFetcher = useFetcher();
   const updateFormRef = React.useRef<HTMLFormElement>(null);
 
+  const isToggling = Boolean(toggleFetcher.submission);
+  const complete = isToggling
+    ? toggleFetcher.submission?.formData.get("complete") === "true"
+    : todo.complete;
+
   const shouldRender =
     filter === "all" ||
-    (filter === "complete" && todo.complete) ||
-    (filter === "active" && !todo.complete);
+    (filter === "complete" && complete) ||
+    (filter === "active" && !complete);
 
   if (!shouldRender) return null;
 
   return (
-    <li className={todo.complete ? "completed" : ""}>
+    <li className={complete ? "completed" : ""}>
       <div className="view">
         <toggleFetcher.Form method="post">
           <input type="hidden" name="todoId" value={todo.id} />
-          <input
-            type="hidden"
-            name="complete"
-            value={(!todo.complete).toString()}
-          />
+          <input type="hidden" name="complete" value={(!complete).toString()} />
           <button
             type="submit"
             name="intent"
             value="toggleTodo"
             className="toggle"
-            title={todo.complete ? "Mark as incomplete" : "Mark as complete"}
+            title={complete ? "Mark as incomplete" : "Mark as complete"}
           >
-            {todo.complete ? <CompleteIcon /> : <IncompleteIcon />}
+            {complete ? <CompleteIcon /> : <IncompleteIcon />}
           </button>
         </toggleFetcher.Form>
         <updateFetcher.Form
