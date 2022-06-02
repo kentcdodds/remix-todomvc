@@ -220,7 +220,7 @@ export default function TodosRoute() {
               ) : null}
             </createFetcher.Form>
           </header>
-          <section className="main">
+          <section className={cn("main", !data.todos.length && "no-todos")}>
             <toggleAllFetcher.Form method="post">
               <input
                 type="hidden"
@@ -241,13 +241,13 @@ export default function TodosRoute() {
                 ❯
               </button>
             </toggleAllFetcher.Form>
-            <ul className="todo-list">
+            <ul className="todo-list" hidden={!data.todos.length}>
               {data.todos.map((todo) => (
                 <ListItem todo={todo} key={todo.id} filter={filter} />
               ))}
             </ul>
           </section>
-          <footer className="footer">
+          <footer className="footer" hidden={!data.todos.length}>
             <span className="todo-count">
               <strong>{remainingActive.length}</strong>
               <span>

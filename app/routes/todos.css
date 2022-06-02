@@ -106,6 +106,12 @@ body {
   z-index: 2;
   border-top: 1px solid #e6e6e6;
 }
+.main.no-todos {
+  border-top: none;
+}
+.main.no-todos .toggle-all {
+  visibility: hidden;
+}
 
 .toggle-all {
   width: 60px;

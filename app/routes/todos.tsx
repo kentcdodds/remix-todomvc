@@ -340,9 +340,11 @@ export default function TodosRoute() {
     : "all";
 
   const remainingActive = optimisticTodos.filter((t) => !t.complete);
-  const allComplete =
-    todosToRender.filter((t) => optimisticTodos.some((ot) => ot.id === t.id))
-      .length > 0 && remainingActive.length === 0;
+  const optimisticTodosToRender = todosToRender.filter((t) =>
+    optimisticTodos.some((ot) => ot.id === t.id)
+  );
+  const optimisticTodosRemain = optimisticTodosToRender.length > 0;
+  const allComplete = optimisticTodosRemain && remainingActive.length === 0;
 
   return (
     <>
@@ -358,7 +360,7 @@ export default function TodosRoute() {
               />
             ))}
           </header>
-          <section className="main">
+          <section className={cn("main", !optimisticTodosRemain && "no-todos")}>
             <toggleAllFetcher.Form method="post">
               <input
                 type="hidden"
@@ -380,7 +382,7 @@ export default function TodosRoute() {
                 ❯
               </button>
             </toggleAllFetcher.Form>
-            <ul className="todo-list">
+            <ul className="todo-list" hidden={!optimisticTodosRemain}>
               {todosToRender.map((todo) => (
                 <ListItem
                   todo={todo}
@@ -392,7 +394,7 @@ export default function TodosRoute() {
               ))}
             </ul>
           </section>
-          <footer className="footer">
+          <footer className="footer" hidden={!optimisticTodosRemain}>
             <span className="todo-count">
               <strong>{remainingActive.length}</strong>
               <span>
