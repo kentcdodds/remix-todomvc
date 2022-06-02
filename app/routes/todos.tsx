@@ -487,6 +487,7 @@ function CreateInput({ id, hidden }: { id: string; hidden?: boolean }) {
         className="new-todo"
         placeholder="What needs to be done?"
         name="title"
+        autoFocus
         ref={createInputRef}
         aria-invalid={createFetcherData?.error ? true : undefined}
         aria-describedby="new-todo-error"

@@ -210,6 +210,7 @@ export default function TodosRoute() {
                 className="new-todo"
                 placeholder="What needs to be done?"
                 name="title"
+                autoFocus
                 aria-invalid={createFetcherData?.error ? true : undefined}
                 aria-describedby="new-todo-error"
               />
