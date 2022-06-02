@@ -51,7 +51,7 @@ function validateId(id: string) {
 }
 
 function validateCreatedAt(createdAt: string) {
-  if (!createdAt) return "Todo createdAt required";
+  if (!createdAt) return null;
   const dateTime = new Date(createdAt).getTime();
   if (Number.isNaN(dateTime)) return "Todo createdAt date is invalid";
 }
@@ -113,7 +113,7 @@ export const action: ActionFunction = async ({ request }) => {
           complete: false,
           title: String(title),
           userId,
-          createdAt: new Date(createdAt),
+          createdAt: createdAt ? new Date(createdAt) : undefined,
         },
       });
       return new Response(null);
