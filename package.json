@@ -31,8 +31,8 @@
     "@remix-run/server-runtime": "^1.5.1",
     "bcryptjs": "^2.4.3",
     "cuid": "^2.1.8",
-    "react": "^18.1.0",
-    "react-dom": "^18.1.0",
+    "react": "18.2.0-next-d2c9e834a-20220601",
+    "react-dom": "18.2.0-next-d2c9e834a-20220601",
     "tiny-invariant": "^1.2.0"
   },
   "devDependencies": {
