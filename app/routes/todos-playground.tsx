@@ -1,10 +1,6 @@
 import * as React from "react";
 import type { Todo } from "@prisma/client";
-import type {
-  ActionFunction,
-  LinksFunction,
-  LoaderFunction,
-} from "@remix-run/node";
+import type { LinksFunction, LoaderArgs, ActionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import {
   useCatch,
@@ -22,23 +18,19 @@ import { CompleteIcon, IncompleteIcon } from "~/icons";
 type TodoItem = Pick<Todo, "id" | "complete" | "title">;
 type Filter = "all" | "active" | "complete";
 
-type LoaderData = {
-  todos: Array<TodoItem>;
-};
-
 export const links: LinksFunction = () => {
   return [{ rel: "stylesheet", href: todosStylesheet }];
 };
 
-export const loader: LoaderFunction = async ({ request }) => {
+export async function loader({ request }: LoaderArgs) {
   const userId = await requireUserId(request);
-  return json<LoaderData>({
+  return json({
     todos: await prisma.todo.findMany({
       where: { userId },
       select: { id: true, complete: true, title: true },
     }),
   });
-};
+}
 
 function validateNewTodoTitle(title: string) {
   return title ? null : "Todo title required";
@@ -54,9 +46,10 @@ type UpdateTodoActionData = {
   error: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const action: ActionFunction = async ({ request }) => {
+export async function action({ request }: ActionArgs) {
   // await sleep(Math.random() * 1000 + 500);
   const formData = await request.formData();
   const userId = await requireUserId(request);
@@ -167,12 +160,12 @@ export const action: ActionFunction = async ({ request }) => {
       throw json({ message: `Unknown intent: ${intent}` }, { status: 400 });
     }
   }
-};
+}
 
 const cn = (...cns: Array<string | false>) => cns.filter(Boolean).join(" ");
 
 export default function TodosRoute() {
-  const data = useLoaderData() as LoaderData;
+  const data = useLoaderData<typeof loader>();
   const createFetcher = useFetcher();
   const clearFetcher = useFetcher();
   const toggleAllFetcher = useFetcher();
@@ -204,6 +197,12 @@ export default function TodosRoute() {
               ref={createFormRef}
               method="post"
               className="create-form"
+              onSubmit={(event) => {
+                const form = event.currentTarget;
+                requestAnimationFrame(() => {
+                  form.reset();
+                });
+              }}
             >
               <input type="hidden" name="intent" value="createTodo" />
               <input
