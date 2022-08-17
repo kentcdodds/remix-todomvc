@@ -66,6 +66,7 @@ type UpdateTodoActionData = {
   error: string;
 };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const action: ActionFunction = async ({ request }) => {
@@ -83,9 +84,6 @@ export const action: ActionFunction = async ({ request }) => {
       invariant(typeof title === "string", "title must be a string");
       invariant(typeof id === "string", "id must be a string");
       invariant(typeof createdAt === "string", "createdAt must be a string");
-      // if (Math.random() > 0.5) {
-      //   return json({ title, error: `Random failure` }, { status: 500 });
-      // }
       if (title.includes("error")) {
         return json<CreateTodoActionData>(
           { id, error: `Todos cannot include the word "error"` },
@@ -119,9 +117,6 @@ export const action: ActionFunction = async ({ request }) => {
       return new Response(null);
     }
     case "toggleAllTodos": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.updateMany({
         where: { userId },
         data: { complete: formData.get("complete") === "true" },
@@ -129,9 +124,6 @@ export const action: ActionFunction = async ({ request }) => {
       return new Response(null);
     }
     case "deleteCompletedTodos": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.deleteMany({ where: { complete: true, userId } });
       return new Response(null);
     }
@@ -147,9 +139,6 @@ export const action: ActionFunction = async ({ request }) => {
 
   switch (intent) {
     case "toggleTodo": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.update({
         where: { id: todoId },
         data: { complete: formData.get("complete") === "true" },
@@ -159,9 +148,6 @@ export const action: ActionFunction = async ({ request }) => {
     case "updateTodo": {
       const title = formData.get("title");
       invariant(typeof title === "string", "title must be a string");
-      // if (Math.random() > 0.5) {
-      //   return json({ title, error: `Random failure` }, { status: 500 });
-      // }
       if (title.includes("error")) {
         return json<UpdateTodoActionData>(
           { title, error: `Todos cannot include the word "error"` },
@@ -183,9 +169,6 @@ export const action: ActionFunction = async ({ request }) => {
       return new Response(null);
     }
     case "deleteTodo": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.delete({ where: { id: todoId } });
       return new Response(null);
     }

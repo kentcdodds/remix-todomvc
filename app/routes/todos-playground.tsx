@@ -60,9 +60,6 @@ export async function action({ request }: ActionArgs) {
     case "createTodo": {
       const title = formData.get("title");
       invariant(typeof title === "string", "title must be a string");
-      // if (Math.random() > 0.5) {
-      //   return json({ title, error: `Random failure` }, { status: 500 });
-      // }
       if (title.includes("error")) {
         return json<CreateTodoActionData>(
           { title, error: `Todos cannot include the word "error"` },
@@ -86,9 +83,6 @@ export async function action({ request }: ActionArgs) {
       return new Response("ok");
     }
     case "toggleAllTodos": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.updateMany({
         where: { userId },
         data: { complete: formData.get("complete") === "true" },
@@ -96,9 +90,6 @@ export async function action({ request }: ActionArgs) {
       return new Response("ok");
     }
     case "deleteCompletedTodos": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.deleteMany({ where: { complete: true, userId } });
       return new Response("ok");
     }
@@ -114,9 +105,6 @@ export async function action({ request }: ActionArgs) {
 
   switch (intent) {
     case "toggleTodo": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.update({
         where: { id: todoId },
         data: { complete: formData.get("complete") === "true" },
@@ -126,9 +114,6 @@ export async function action({ request }: ActionArgs) {
     case "updateTodo": {
       const title = formData.get("title");
       invariant(typeof title === "string", "title must be a string");
-      // if (Math.random() > 0.5) {
-      //   return json({ title, error: `Random failure` }, { status: 500 });
-      // }
       if (title.includes("error")) {
         return json<UpdateTodoActionData>(
           { title, error: `Todos cannot include the word "error"` },
@@ -150,9 +135,6 @@ export async function action({ request }: ActionArgs) {
       return new Response("ok");
     }
     case "deleteTodo": {
-      // if (Math.random() > 0.5) {
-      //   return json({ error: `Random failure` }, { status: 500 });
-      // }
       await prisma.todo.delete({ where: { id: todoId } });
       return new Response("ok");
     }
