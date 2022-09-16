@@ -358,3 +358,7 @@ html .clear-completed:active {
   right: 4px;
   bottom: 4px;
 }
+
+[disabled] {
+  background-color: rgb(230 230 230);
+}
