@@ -1,11 +1,10 @@
 import * as React from "react";
-import type { Todo } from "@prisma/client";
-import type {
-  ActionFunction,
-  LinksFunction,
-  LoaderFunction,
+import type { SerializeFrom } from "@remix-run/node";
+import {
+  json,
+  type DataFunctionArgs,
+  type LinksFunction,
 } from "@remix-run/node";
-import { json } from "@remix-run/node";
 import {
   useCatch,
   useFetcher,
@@ -21,26 +20,22 @@ import invariant from "tiny-invariant";
 import { CompleteIcon, IncompleteIcon } from "~/icons";
 import cuid from "cuid";
 
-type TodoItem = Pick<Todo, "id" | "complete" | "title" | "createdAt">;
+type TodoItem = SerializeFrom<typeof loader>["todos"][number];
 type Filter = "all" | "active" | "complete";
-
-type LoaderData = {
-  todos: Array<TodoItem>;
-};
 
 export const links: LinksFunction = () => {
   return [{ rel: "stylesheet", href: todosStylesheet }];
 };
 
-export const loader: LoaderFunction = async ({ request }) => {
+export async function loader({ request }: DataFunctionArgs) {
   const userId = await requireUserId(request);
-  return json<LoaderData>({
+  return json({
     todos: await prisma.todo.findMany({
       where: { userId },
       select: { id: true, complete: true, title: true, createdAt: true },
     }),
   });
-};
+}
 
 function validateNewTodoTitle(title: string) {
   return title ? null : "Todo title required";
@@ -56,127 +51,149 @@ function validateCreatedAt(createdAt: string) {
   if (Number.isNaN(dateTime)) return "Todo createdAt date is invalid";
 }
 
-type CreateTodoActionData = {
-  id: string;
-  error: string;
-};
+const generalActions = {
+  async createTodo({ formData, userId }) {
+    const title = formData.get("title");
+    const id = formData.get("id");
+    const createdAt = formData.get("createdAt");
+    invariant(typeof title === "string", "title must be a string");
+    invariant(typeof id === "string", "id must be a string");
+    invariant(typeof createdAt === "string", "createdAt must be a string");
+    if (title.includes("error")) {
+      return json(
+        {
+          type: "error",
+          error: `Todos cannot include the word "error"`,
+        },
+        { status: 400 }
+      );
+    }
+    const createdAtError = validateCreatedAt(createdAt);
+    if (createdAtError) {
+      throw new Error("We messed up the createdAt. Sorry");
+    }
+    const idError = validateId(id);
+    if (idError) {
+      throw new Error("We messed up the id. Sorry");
+    }
+    const titleError = validateNewTodoTitle(title);
+    if (titleError) {
+      return json({ type: "error", error: titleError }, { status: 400 });
+    }
+    await prisma.todo.create({
+      data: {
+        id,
+        complete: false,
+        title: String(title),
+        userId,
+        createdAt: createdAt ? new Date(createdAt) : undefined,
+      },
+    });
+    return json({ type: "success" });
+  },
+  async toggleAllTodos({ formData, userId }) {
+    await prisma.todo.updateMany({
+      where: { userId },
+      data: { complete: formData.get("complete") === "true" },
+    });
+    return json({ type: "success" });
+  },
+  async deleteCompletedTodos({ userId }) {
+    await prisma.todo.deleteMany({ where: { complete: true, userId } });
+    return json({ type: "success" });
+  },
+} satisfies Record<
+  string,
+  (args: {
+    formData: FormData;
+    userId: string;
+  }) => Promise<
+    ReturnType<
+      typeof json<{ type: "success" } | { type: "error"; error: string }>
+    >
+  >
+>;
 
-type UpdateTodoActionData = {
-  title: string;
-  error: string;
-};
+const todoActions = {
+  async toggleTodo({ todoId, formData }) {
+    await prisma.todo.update({
+      where: { id: todoId },
+      data: { complete: formData.get("complete") === "true" },
+    });
+    return json({ type: "success" });
+  },
+  async updateTodo({ formData, todoId }) {
+    const title = formData.get("title");
+    invariant(typeof title === "string", "title must be a string");
+    if (title.includes("error")) {
+      return json(
+        { type: "error", error: `Todos cannot include the word "error"` },
+        { status: 400 }
+      );
+    }
+    const titleError = validateNewTodoTitle(title);
+    if (titleError) {
+      return json({ type: "error", error: titleError }, { status: 400 });
+    }
+
+    await prisma.todo.update({
+      where: { id: todoId },
+      data: { title },
+    });
+    return json({ type: "success" });
+  },
+  async deleteTodo({ todoId }) {
+    await prisma.todo.delete({ where: { id: todoId } });
+    return json({ type: "success" });
+  },
+} satisfies Record<
+  string,
+  (args: {
+    formData: FormData;
+    userId: string;
+    todoId: string;
+  }) => Promise<
+    ReturnType<
+      typeof json<{ type: "success" } | { type: "error"; error: string }>
+    >
+  >
+>;
+
+type ValidGeneralIntents = keyof typeof generalActions;
+function isValidGeneralIntent(intent: any): intent is ValidGeneralIntents {
+  return Object.keys(generalActions).includes(intent);
+}
+
+type ValidTodoIntents = keyof typeof todoActions;
+function isValidTodoIntent(intent: any): intent is ValidTodoIntents {
+  return Object.keys(todoActions).includes(intent);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const action: ActionFunction = async ({ request }) => {
+export async function action({ request }: DataFunctionArgs) {
   // await sleep(Math.random() * 1000 + 500);
   const formData = await request.formData();
   const userId = await requireUserId(request);
-
   const intent = formData.get("intent");
 
-  switch (intent) {
-    case "createTodo": {
-      const title = formData.get("title");
-      const id = formData.get("id");
-      const createdAt = formData.get("createdAt");
-      invariant(typeof title === "string", "title must be a string");
-      invariant(typeof id === "string", "id must be a string");
-      invariant(typeof createdAt === "string", "createdAt must be a string");
-      if (title.includes("error")) {
-        return json<CreateTodoActionData>(
-          { id, error: `Todos cannot include the word "error"` },
-          { status: 400 }
-        );
-      }
-      const createdAtError = validateCreatedAt(createdAt);
-      if (createdAtError) {
-        throw new Error("We messed up the createdAt. Sorry");
-      }
-      const idError = validateId(id);
-      if (idError) {
-        throw new Error("We messed up the id. Sorry");
-      }
-      const titleError = validateNewTodoTitle(title);
-      if (titleError) {
-        return json<CreateTodoActionData>(
-          { id, error: titleError },
-          { status: 400 }
-        );
-      }
-      await prisma.todo.create({
-        data: {
-          id,
-          complete: false,
-          title: String(title),
-          userId,
-          createdAt: createdAt ? new Date(createdAt) : undefined,
-        },
-      });
-      return new Response(null);
+  if (isValidGeneralIntent(intent)) {
+    return generalActions[intent]({ formData, userId });
+  } else if (isValidTodoIntent(intent)) {
+    const todoId = formData.get("todoId");
+    invariant(typeof todoId === "string", "todoId must be a string");
+    // make sure the todo belongs to the user
+    const todo = await prisma.todo.findFirst({ where: { id: todoId, userId } });
+
+    if (!todo) {
+      throw json({ error: "todo not found" }, { status: 404 });
     }
-    case "toggleAllTodos": {
-      await prisma.todo.updateMany({
-        where: { userId },
-        data: { complete: formData.get("complete") === "true" },
-      });
-      return new Response(null);
-    }
-    case "deleteCompletedTodos": {
-      await prisma.todo.deleteMany({ where: { complete: true, userId } });
-      return new Response(null);
-    }
+    return todoActions[intent]({ formData, userId, todoId });
+  } else {
+    throw json({ error: `Unknown intent: ${intent}` }, { status: 400 });
   }
-
-  const todoId = String(formData.get("todoId"));
-  // make sure the todo belongs to the user
-  const todo = await prisma.todo.findFirst({ where: { id: todoId, userId } });
-
-  if (!todo) {
-    throw json({ error: "todo not found" }, { status: 404 });
-  }
-
-  switch (intent) {
-    case "toggleTodo": {
-      await prisma.todo.update({
-        where: { id: todoId },
-        data: { complete: formData.get("complete") === "true" },
-      });
-      return new Response(null);
-    }
-    case "updateTodo": {
-      const title = formData.get("title");
-      invariant(typeof title === "string", "title must be a string");
-      if (title.includes("error")) {
-        return json<UpdateTodoActionData>(
-          { title, error: `Todos cannot include the word "error"` },
-          { status: 400 }
-        );
-      }
-      const titleError = validateNewTodoTitle(title);
-      if (titleError) {
-        return json<UpdateTodoActionData>(
-          { title, error: titleError },
-          { status: 400 }
-        );
-      }
-
-      await prisma.todo.update({
-        where: { id: todoId },
-        data: { title },
-      });
-      return new Response(null);
-    }
-    case "deleteTodo": {
-      await prisma.todo.delete({ where: { id: todoId } });
-      return new Response(null);
-    }
-    default: {
-      throw json({ message: `Unknown intent: ${intent}` }, { status: 400 });
-    }
-  }
-};
+}
 
 const cn = (...cns: Array<string | false>) => cns.filter(Boolean).join(" ");
 
@@ -188,10 +205,7 @@ function canBeOptimistic(fetcher: { state: string; data: any }) {
 }
 
 export default function TodosRoute() {
-  const todos = useLoaderData().todos.map((t: any) => ({
-    ...t,
-    createdAt: new Date(t.createdAt),
-  })) as LoaderData["todos"];
+  const { todos } = useLoaderData<typeof loader>();
   const clearFetcher = useFetcher();
   const toggleAllFetcher = useFetcher();
   const location = useLocation();
@@ -279,7 +293,7 @@ export default function TodosRoute() {
   const newTodoIdToDisplay =
     firstFailedNewTodoFetcher?.data.id ?? newTodoIds.at(-1);
 
-  const optimisticNewTodos: Array<TodoItem> = [];
+  const optimisticNewTodos: typeof todos = [];
   for (const fetcher of createFetchers) {
     const newTodoTitle = fetcher.submission?.formData.get("title");
     const id = fetcher.submission?.formData.get("id");
@@ -301,7 +315,7 @@ export default function TodosRoute() {
         id,
         title: newTodoTitle,
         complete: false,
-        createdAt: new Date(createdAt),
+        createdAt: new Date(createdAt).toISOString(),
       };
       optimisticTodos.push(newTodo);
       optimisticNewTodos.push(newTodo);
@@ -309,7 +323,9 @@ export default function TodosRoute() {
   }
 
   const todosToRender = [...todos, ...optimisticNewTodos].sort((a, b) => {
-    return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
+    const aCreated = new Date(a.createdAt);
+    const bCreated = new Date(b.createdAt);
+    return aCreated < bCreated ? -1 : aCreated > bCreated ? 1 : 0;
   });
 
   const hasCompleteTodos = optimisticTodos.some(
@@ -440,11 +456,9 @@ export default function TodosRoute() {
 }
 
 function CreateInput({ id, hidden }: { id: string; hidden?: boolean }) {
-  const createFetcher = useFetcher();
+  const createFetcher = useFetcher<typeof generalActions["createTodo"]>();
 
-  const createFetcherData = createFetcher.data as
-    | CreateTodoActionData
-    | undefined;
+  const createFetcherData = createFetcher.data;
 
   const createInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -472,10 +486,10 @@ function CreateInput({ id, hidden }: { id: string; hidden?: boolean }) {
         name="title"
         autoFocus
         ref={createInputRef}
-        aria-invalid={createFetcherData?.error ? true : undefined}
+        aria-invalid={createFetcherData?.type === "error" ? true : undefined}
         aria-describedby="new-todo-error"
       />
-      {createFetcherData?.error ? (
+      {createFetcherData?.type === "error" ? (
         <div className="error" id="new-todo-error">
           {createFetcherData?.error}
         </div>
@@ -495,9 +509,9 @@ function ListItem({
   togglingComplete?: boolean;
   clearingTodos: boolean;
 }) {
-  const updateFetcher = useFetcher();
-  const toggleFetcher = useFetcher();
-  const deleteFetcher = useFetcher();
+  const updateFetcher = useFetcher<typeof todoActions["updateTodo"]>();
+  const toggleFetcher = useFetcher<typeof todoActions["toggleTodo"]>();
+  const deleteFetcher = useFetcher<typeof todoActions["deleteTodo"]>();
   const updateFormRef = React.useRef<HTMLFormElement>(null);
 
   const isDeleting =
@@ -557,10 +571,13 @@ function ListItem({
                 updateFetcher.submit(e.currentTarget.form);
               }
             }}
-            aria-invalid={updateFetcher.data?.error ? true : undefined}
+            aria-invalid={
+              updateFetcher.data?.type === "error" ? true : undefined
+            }
             aria-describedby={`todo-update-error-${todo.id}`}
           />
-          {updateFetcher.data?.error && updateFetcher.state !== "submitting" ? (
+          {updateFetcher.data?.type === "error" &&
+          updateFetcher.state !== "submitting" ? (
             <div
               className="error todo-update-error"
               id={`todo-update-error-${todo.id}`}
@@ -589,7 +606,7 @@ export function CatchBoundary() {
   const caught = useCatch();
 
   if (caught.status === 400) {
-    return <div>You did something wrong: {caught.data.message}</div>;
+    return <div>You did something wrong: {caught.data.error}</div>;
   }
 
   if (caught.status === 404) {
