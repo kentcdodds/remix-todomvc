@@ -12,13 +12,14 @@ import {
   Link,
   useLocation,
   useFetchers,
+  Form,
 } from "@remix-run/react";
-import { prisma } from "~/db.server";
-import { requireUserId } from "~/session.server";
-import todosStylesheet from "./todos.css";
 import invariant from "tiny-invariant";
-import { CompleteIcon, IncompleteIcon } from "~/icons";
 import cuid from "cuid";
+import { prisma } from "~/db.server";
+import { requireUser } from "~/session.server";
+import { useUser } from "~/utils";
+import todosStylesheet from "./todos.css";
 
 type TodoItem = SerializeFrom<typeof loader>["todos"][number];
 type Filter = "all" | "active" | "complete";
@@ -28,7 +29,7 @@ export const links: LinksFunction = () => {
 };
 
 export async function loader({ request }: DataFunctionArgs) {
-  const userId = await requireUserId(request);
+  const { id: userId } = await requireUser(request);
   return json({
     todos: await prisma.todo.findMany({
       where: { userId },
@@ -159,14 +160,11 @@ const todoActions = {
   >
 >;
 
-type ValidGeneralIntents = keyof typeof generalActions;
-function isValidGeneralIntent(intent: any): intent is ValidGeneralIntents {
-  return Object.keys(generalActions).includes(intent);
-}
-
-type ValidTodoIntents = keyof typeof todoActions;
-function isValidTodoIntent(intent: any): intent is ValidTodoIntents {
-  return Object.keys(todoActions).includes(intent);
+function hasKey<Obj extends Record<string, unknown>>(
+  obj: Obj,
+  key: any
+): key is keyof Obj {
+  return obj.hasOwnProperty(key);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -175,12 +173,12 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function action({ request }: DataFunctionArgs) {
   // await sleep(Math.random() * 1000 + 500);
   const formData = await request.formData();
-  const userId = await requireUserId(request);
+  const { id: userId } = await requireUser(request);
   const intent = formData.get("intent");
 
-  if (isValidGeneralIntent(intent)) {
+  if (hasKey(generalActions, intent)) {
     return generalActions[intent]({ formData, userId });
-  } else if (isValidTodoIntent(intent)) {
+  } else if (hasKey(todoActions, intent)) {
     const todoId = formData.get("todoId");
     invariant(typeof todoId === "string", "todoId must be a string");
     // make sure the todo belongs to the user
@@ -205,6 +203,7 @@ function canBeOptimistic(fetcher: { state: string; data: any }) {
 }
 
 export default function TodosRoute() {
+  const user = useUser();
   const { todos } = useLoaderData<typeof loader>();
   const clearFetcher = useFetcher();
   const toggleAllFetcher = useFetcher();
@@ -448,8 +447,14 @@ export default function TodosRoute() {
           Created by <a href="http://github.com/kentcdodds">Kent C. Dodds</a>
         </p>
         <p>
-          Part of <a href="http://todomvc.com">TodoMVC</a>
+          Inspired by <a href="http://todomvc.com">TodoMVC</a>
         </p>
+        <div>
+          {user.email}{" "}
+          <Form method="post" action="/logout">
+            <button type="submit">Logout</button>
+          </Form>
+        </div>
       </footer>
     </>
   );
@@ -545,14 +550,14 @@ function ListItem({
             type="submit"
             name="intent"
             value="toggleTodo"
-            className="toggle"
+            className={`toggle toggle-${
+              optimisticComplete ? "complete" : "incomplete"
+            }`}
             disabled={todo.id === "new"}
             title={
               optimisticComplete ? "Mark as incomplete" : "Mark as complete"
             }
-          >
-            {optimisticComplete ? <CompleteIcon /> : <IncompleteIcon />}
-          </button>
+          />
         </toggleFetcher.Form>
         <updateFetcher.Form
           method="post"
