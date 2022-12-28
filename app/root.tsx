@@ -1,5 +1,8 @@
-import type { DataFunctionArgs, MetaFunction } from "@remix-run/node";
-import { json } from "@remix-run/node";
+import {
+  json,
+  type DataFunctionArgs,
+  type MetaFunction,
+} from "@remix-run/node";
 import {
   Links,
   LiveReload,
@@ -7,6 +10,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  type ShouldRevalidateFunction,
 } from "@remix-run/react";
 import { getUser } from "./session.server";
 
@@ -18,6 +22,12 @@ export const meta: MetaFunction = () => ({
 
 export async function loader({ request }: DataFunctionArgs) {
   return json({ user: await getUser(request) });
+}
+
+export function shouldRevalidate({
+  formAction,
+}: Parameters<ShouldRevalidateFunction>[0]) {
+  return formAction === "/logout" || formAction === "/login";
 }
 
 export default function App() {

@@ -1,21 +1,21 @@
-import * as React from "react";
-import type { SerializeFrom } from "@remix-run/node";
 import {
   json,
   type DataFunctionArgs,
   type LinksFunction,
+  type SerializeFrom,
 } from "@remix-run/node";
 import {
+  Form,
+  Link,
   useCatch,
   useFetcher,
-  useLoaderData,
-  Link,
-  useLocation,
   useFetchers,
-  Form,
+  useLoaderData,
+  useLocation,
 } from "@remix-run/react";
-import invariant from "tiny-invariant";
 import cuid from "cuid";
+import * as React from "react";
+import invariant from "tiny-invariant";
 import { prisma } from "~/db.server";
 import { requireUser } from "~/session.server";
 import { useUser } from "~/utils";
@@ -82,7 +82,10 @@ const generalActions = {
     }
     const titleError = validateNewTodoTitle(title);
     if (titleError) {
-      return json({ type: "error", error: titleError }, { status: 400 });
+      return json(
+        { type: "error", intent, error: titleError },
+        { status: 400 }
+      );
     }
     await prisma.todo.create({
       data: {

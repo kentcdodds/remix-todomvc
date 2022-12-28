@@ -1,6 +1,5 @@
 import { faker } from "@faker-js/faker";
-import type { Page } from "@playwright/test";
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { parse } from "cookie";

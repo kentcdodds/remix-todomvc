@@ -1,15 +1,14 @@
-import type {
-  ActionFunction,
-  LinksFunction,
-  LoaderFunction,
-  MetaFunction,
+import {
+  json,
+  redirect,
+  type DataFunctionArgs,
+  type LinksFunction,
+  type MetaFunction,
 } from "@remix-run/node";
-import { json, redirect } from "@remix-run/node";
 import { Form, useActionData, useSearchParams } from "@remix-run/react";
 import * as React from "react";
-
-import { createUserSession, getUserId } from "~/session.server";
 import { createUser, getUserByEmail, verifyLogin } from "~/models/user.server";
+import { createUserSession, getUserId } from "~/session.server";
 import { validateEmail } from "~/utils";
 
 import tailwindStylesheetUrl from "~/styles/tailwind.css";
@@ -18,20 +17,13 @@ export const links: LinksFunction = () => {
   return [{ rel: "stylesheet", href: tailwindStylesheetUrl }];
 };
 
-export const loader: LoaderFunction = async ({ request }) => {
+export async function loader({ request }: DataFunctionArgs) {
   const userId = await getUserId(request);
-  if (userId) return redirect("/");
+  if (userId) return redirect("/todos");
   return json({});
-};
-
-interface ActionData {
-  errors?: {
-    email?: string;
-    password?: string;
-  };
 }
 
-export const action: ActionFunction = async ({ request }) => {
+export async function action({ request }: DataFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent");
   const email = formData.get("email");
@@ -40,22 +32,22 @@ export const action: ActionFunction = async ({ request }) => {
   const remember = formData.get("remember");
 
   if (!validateEmail(email)) {
-    return json<ActionData>(
-      { errors: { email: "Email is invalid" } },
+    return json(
+      { errors: { email: "Email is invalid", password: null } },
       { status: 400 }
     );
   }
 
   if (typeof password !== "string") {
-    return json<ActionData>(
-      { errors: { password: "Password is required" } },
+    return json(
+      { errors: { email: null, password: "Password is required" } },
       { status: 400 }
     );
   }
 
   if (password.length < 8) {
-    return json<ActionData>(
-      { errors: { password: "Password is too short" } },
+    return json(
+      { errors: { email: null, password: "Password is too short" } },
       { status: 400 }
     );
   }
@@ -67,8 +59,13 @@ export const action: ActionFunction = async ({ request }) => {
   } else if (intent === "signup") {
     const existingUser = await getUserByEmail(email);
     if (existingUser) {
-      return json<ActionData>(
-        { errors: { email: "A user already exists with this email" } },
+      return json(
+        {
+          errors: {
+            email: "A user already exists with this email",
+            password: null,
+          },
+        },
         { status: 400 }
       );
     }
@@ -80,8 +77,8 @@ export const action: ActionFunction = async ({ request }) => {
   }
 
   if (!userId) {
-    return json<ActionData>(
-      { errors: { email: "Invalid email or password" } },
+    return json(
+      { errors: { email: "Invalid email or password", password: null } },
       { status: 400 }
     );
   }
@@ -90,20 +87,18 @@ export const action: ActionFunction = async ({ request }) => {
     request,
     userId,
     remember: remember === "on" ? true : false,
-    redirectTo: typeof redirectTo === "string" ? redirectTo : "/",
+    redirectTo: typeof redirectTo === "string" ? redirectTo : "/todos",
   });
-};
+}
 
 export const meta: MetaFunction = () => {
-  return {
-    title: "Login",
-  };
+  return { title: "Login" };
 };
 
 export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/";
-  const actionData = useActionData() as ActionData;
+  const actionData = useActionData<typeof action>();
   const emailRef = React.useRef<HTMLInputElement>(null);
   const passwordRef = React.useRef<HTMLInputElement>(null);
 
