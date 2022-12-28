@@ -46,21 +46,27 @@ test("Simple todo crud", async ({ page, baseURL }) => {
   const newTodoInput = page.getByRole("textbox", {
     name: "What needs to be done?",
   });
+  const clearCompletedButton = page.getByRole("button", {
+    name: "Clear completed",
+  });
   await expect(markAsCompleteButton).not.toBeVisible();
+  await expect(clearCompletedButton).not.toBeVisible();
+  await expect(page.getByText(/item left/)).not.toBeVisible();
+
   await newTodoInput.fill("Buy milk");
   await newTodoInput.press("Enter");
-  const deleteTodoButton = page.getByRole("button", { name: "Delete todo" });
-  await expect(deleteTodoButton).not.toBeVisible();
+
+  await expect(page.getByText("1 item left")).toBeVisible();
+  await expect(markAsCompleteButton).toBeVisible();
+  await expect(clearCompletedButton).not.toBeVisible();
+
   await page.getByRole("button", { name: "Mark as complete" }).click();
+  await expect(clearCompletedButton).toBeVisible();
   await page.getByRole("button", { name: "Mark as incomplete" }).click();
-  await deleteTodoButton.hover();
-  await expect(deleteTodoButton).toBeVisible();
-  await deleteTodoButton.click();
+  await page.getByRole("button", { name: "Delete todo" }).click();
 });
 
-export const dataCleanup = {
-  users: new Set<string>(),
-};
+const testUserIds = new Set<string>();
 
 type LoginForm = {
   email: string;
@@ -96,7 +102,7 @@ export async function insertNewUser({ password }: { password?: string } = {}) {
         },
       },
     });
-    dataCleanup.users.add(user.id);
+    testUserIds.add(user.id);
     return user;
   });
 }
@@ -148,7 +154,7 @@ export async function loginPage({
 test.afterEach(async () => {
   await runPrisma(async (prisma) => {
     await prisma.user.deleteMany({
-      where: { id: { in: [...dataCleanup.users] } },
+      where: { id: { in: [...testUserIds] } },
     });
   });
 });

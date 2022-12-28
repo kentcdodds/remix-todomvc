@@ -383,9 +383,7 @@ export default function TodosRoute() {
                     ? "Mark all as incomplete"
                     : "Mark all as complete"
                 }
-              >
-                ❯
-              </button>
+              />
             </toggleAllFetcher.Form>
             <ul className="todo-list" hidden={!optimisticTodosRemain}>
               {todosToRender.map((todo) => (

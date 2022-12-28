@@ -83,18 +83,18 @@
 
 .toggle-all {
   width: 60px;
-  height: 34px;
-  font-size: 22px;
+  height: 66px;
   position: absolute;
-  top: -52px;
+  top: -67px;
   left: 0;
-  -webkit-transform: rotate(90deg);
-  transform: rotate(90deg);
-  color: #949494;
+  opacity: 0.4;
+  background-image: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%3E%3Cpath%20d%3D%22M1.646%204.646a.5.5%200%200%201%20.708%200L8%2010.293l5.646-5.647a.5.5%200%200%201%20.708.708l-6%206a.5.5%200%200%201-.708%200l-6-6a.5.5%200%200%201%200-.708z%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
 .toggle-all.checked {
-  color: #484848;
+  opacity: 1;
 }
 
 .todo-list {
