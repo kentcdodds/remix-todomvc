@@ -1,7 +1,8 @@
+import { type User } from "@prisma/client";
 import { createCookieSessionStorage, redirect } from "@remix-run/node";
 import invariant from "tiny-invariant";
-
-import { getUserById, type User } from "~/models/user.server";
+import { prisma } from "./db.server";
+import { safeRedirect } from "./utils";
 
 invariant(process.env.SESSION_SECRET, "SESSION_SECRET must be set");
 
@@ -33,7 +34,7 @@ export async function getUserId(request: Request): Promise<string | undefined> {
 export async function getUser(request: Request): Promise<null | User> {
   const userId = await getUserId(request);
   if (userId === undefined) return null;
-  return getUserById(userId);
+  return prisma.user.findUnique({ where: { id: userId } });
 }
 
 export async function requireUserId(
@@ -52,7 +53,7 @@ export async function requireUserId(
 
 export async function requireUser(request: Request) {
   const userId = await requireUserId(request);
-  const user = await getUserById(userId);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
     const logoutResponse = await logout(request);
     throw logoutResponse;
@@ -73,7 +74,7 @@ export async function createUserSession({
 }) {
   const session = await getSession(request);
   session.set(USER_SESSION_KEY, userId);
-  return redirect(redirectTo, {
+  return redirect(safeRedirect(redirectTo), {
     headers: {
       "Set-Cookie": await sessionStorage.commitSession(session, {
         maxAge: remember

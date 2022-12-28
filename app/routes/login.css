@@ -1,0 +1,52 @@
+.login-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  height: 100vh;
+  min-height: 400px;
+  justify-content: center;
+  align-items: center;
+}
+
+h1 {
+  color: #b83f45;
+  font-weight: 100;
+  font-size: 100px;
+  line-height: 1;
+  text-align: center;
+  margin: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+button {
+  background-color: #ce4646;
+  color: white;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  font-size: 1.5rem;
+}
+
+input {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ce4646;
+  border-radius: 0.25rem;
+  font-size: 1.3rem;
+  display: block;
+}
+input[type="checkbox"] {
+  display: inline-block;
+}
+
+label {
+  font-size: 1.3rem;
+}
+
+label.invalid,
+[id$="-error"] {
+  color: #ce4646;
+}

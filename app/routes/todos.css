@@ -1,39 +1,6 @@
-html,
-body {
-  margin: 0;
-  padding: 0;
-}
-
-button {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 100%;
-  vertical-align: baseline;
-  font-family: inherit;
-  font-weight: inherit;
-  color: inherit;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-body {
-  font: 14px "Helvetica Neue", Helvetica, Arial, sans-serif;
-  line-height: 1.4em;
-  background: #f5f5f5;
-  color: #111111;
-  min-width: 230px;
-  max-width: 550px;
-  margin: 0 auto;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-weight: 300;
-}
-
 .todoapp {
   background: #fff;
-  margin: 130px 0 40px 0;
+  margin: 150px 0 40px 0;
   position: relative;
   box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.2), 0 25px 50px 0 rgba(0, 0, 0, 0.1);
 }
@@ -58,9 +25,10 @@ body {
 
 .todoapp h1 {
   position: absolute;
-  top: -155px;
+  top: -200px;
   width: 100%;
   font-size: 100px;
+  line-height: 1;
   font-weight: 100;
   text-align: center;
   color: #b83f45;
@@ -231,7 +199,7 @@ body {
 
 .footer {
   padding: 10px 15px;
-  height: 20px;
+  height: 42px;
   text-align: center;
   border-top: 1px solid #e6e6e6;
 }

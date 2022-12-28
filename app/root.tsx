@@ -1,5 +1,6 @@
 import {
   json,
+  type LinksFunction,
   type DataFunctionArgs,
   type MetaFunction,
 } from "@remix-run/node";
@@ -13,6 +14,11 @@ import {
   type ShouldRevalidateFunction,
 } from "@remix-run/react";
 import { getUser } from "./session.server";
+import rootStylesheetUrl from "./root.css";
+
+export const links: LinksFunction = () => {
+  return [{ rel: "stylesheet", href: rootStylesheetUrl }];
+};
 
 export const meta: MetaFunction = () => ({
   charset: "utf-8",
@@ -32,12 +38,12 @@ export function shouldRevalidate({
 
 export default function App() {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en">
       <head>
         <Meta />
         <Links />
       </head>
-      <body className="h-full">
+      <body>
         <Outlet />
         <ScrollRestoration />
         <Scripts />
