@@ -452,6 +452,10 @@ export default function TodosRoute() {
           Created by <a href="http://github.com/kentcdodds">Kent C. Dodds</a>
         </p>
         <p>
+          Source on{" "}
+          <a href="http://github.com/kentcdodds/remix-todomvc">GitHub</a>
+        </p>
+        <p>
           Inspired by <a href="http://todomvc.com">TodoMVC</a>
         </p>
         <div>
