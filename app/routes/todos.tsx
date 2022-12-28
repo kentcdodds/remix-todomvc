@@ -53,7 +53,7 @@ function validateCreatedAt(createdAt: string) {
 }
 
 const generalActions = {
-  async createTodo({ formData, userId }) {
+  async createTodo({ formData, userId, intent }) {
     const title = formData.get("title");
     const id = formData.get("id");
     const createdAt = formData.get("createdAt");
@@ -64,6 +64,9 @@ const generalActions = {
       return json(
         {
           type: "error",
+          intent,
+          id,
+          title,
           error: `Todos cannot include the word "error"`,
         },
         { status: 400 }
@@ -90,62 +93,73 @@ const generalActions = {
         createdAt: createdAt ? new Date(createdAt) : undefined,
       },
     });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
-  async toggleAllTodos({ formData, userId }) {
+  async toggleAllTodos({ formData, userId, intent }) {
     await prisma.todo.updateMany({
       where: { userId },
       data: { complete: formData.get("complete") === "true" },
     });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
-  async deleteCompletedTodos({ userId }) {
+  async deleteCompletedTodos({ userId, intent }) {
     await prisma.todo.deleteMany({ where: { complete: true, userId } });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
 } satisfies Record<
   string,
   (args: {
     formData: FormData;
     userId: string;
+    intent: string;
   }) => Promise<
     ReturnType<
-      typeof json<{ type: "success" } | { type: "error"; error: string }>
+      typeof json<
+        | { type: "success"; intent: string }
+        | { type: "error"; intent: string; error: string }
+      >
     >
   >
 >;
 
 const todoActions = {
-  async toggleTodo({ todoId, formData }) {
+  async toggleTodo({ todoId, formData, intent }) {
     await prisma.todo.update({
       where: { id: todoId },
       data: { complete: formData.get("complete") === "true" },
     });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
-  async updateTodo({ formData, todoId }) {
+  async updateTodo({ formData, todoId, intent }) {
     const title = formData.get("title");
     invariant(typeof title === "string", "title must be a string");
     if (title.includes("error")) {
       return json(
-        { type: "error", error: `Todos cannot include the word "error"` },
+        {
+          type: "error",
+          intent,
+          error: `Todos cannot include the word "error"`,
+        },
         { status: 400 }
       );
     }
     const titleError = validateNewTodoTitle(title);
     if (titleError) {
-      return json({ type: "error", error: titleError }, { status: 400 });
+      return json(
+        { type: "error", intent, error: titleError },
+        { status: 400 }
+      );
     }
 
     await prisma.todo.update({
       where: { id: todoId },
       data: { title },
     });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
-  async deleteTodo({ todoId }) {
+  async deleteTodo({ todoId, intent }) {
     await prisma.todo.delete({ where: { id: todoId } });
-    return json({ type: "success" });
+    return json({ type: "success", intent });
   },
 } satisfies Record<
   string,
@@ -153,9 +167,13 @@ const todoActions = {
     formData: FormData;
     userId: string;
     todoId: string;
+    intent: string;
   }) => Promise<
     ReturnType<
-      typeof json<{ type: "success" } | { type: "error"; error: string }>
+      typeof json<
+        | { type: "success"; intent: string }
+        | { type: "error"; error: string; intent: string }
+      >
     >
   >
 >;
@@ -177,7 +195,7 @@ export async function action({ request }: DataFunctionArgs) {
   const intent = formData.get("intent");
 
   if (hasKey(generalActions, intent)) {
-    return generalActions[intent]({ formData, userId });
+    return generalActions[intent]({ formData, intent, userId });
   } else if (hasKey(todoActions, intent)) {
     const todoId = formData.get("todoId");
     invariant(typeof todoId === "string", "todoId must be a string");
@@ -187,7 +205,7 @@ export async function action({ request }: DataFunctionArgs) {
     if (!todo) {
       throw json({ error: "todo not found" }, { status: 404 });
     }
-    return todoActions[intent]({ formData, userId, todoId });
+    return todoActions[intent]({ formData, intent, userId, todoId });
   } else {
     throw json({ error: `Unknown intent: ${intent}` }, { status: 400 });
   }
@@ -198,7 +216,7 @@ const cn = (...cns: Array<string | false>) => cns.filter(Boolean).join(" ");
 function canBeOptimistic(fetcher: { state: string; data: any }) {
   return (
     fetcher.state === "submitting" ||
-    (fetcher.state === "loading" && !fetcher.data)
+    (fetcher.state === "loading" && fetcher.data?.type === "success")
   );
 }
 
@@ -226,7 +244,7 @@ export default function TodosRoute() {
       toggleAllFetcher.submission?.formData.get("complete") === "true";
     optimisticTodos = optimisticTodos.map((todo) => ({
       ...todo,
-      complete: togglingComplete as boolean,
+      complete: Boolean(togglingComplete),
     }));
   }
 
@@ -260,21 +278,6 @@ export default function TodosRoute() {
     });
   }
 
-  const newTodoInputNeeded = newTodoIds.every(
-    (id) =>
-      todos.some((t) => t.id === id) ||
-      optimisticFetchers.some(
-        (f) =>
-          f.submission?.formData.get("intent") === "createTodo" &&
-          f.submission?.formData.get("id") === id
-      )
-  );
-  React.useEffect(() => {
-    if (newTodoInputNeeded) {
-      setNewTodoIds((ids) => [...ids, cuid()]);
-    }
-  }, [newTodoInputNeeded]);
-
   const unfinishedTodos = newTodoIds.filter((id) =>
     todos.every((t) => t.id !== id)
   );
@@ -286,7 +289,7 @@ export default function TodosRoute() {
   }, [hasFinishedTodos, unfinishedTodos]);
 
   const firstFailedNewTodoFetcher = allFetchers.find(
-    (f) => !canBeOptimistic(f) && f.state !== "submitting" && f.data?.error
+    (f) => f.data?.intent === "createTodo" && !canBeOptimistic(f)
   );
 
   const newTodoIdToDisplay =
@@ -355,6 +358,7 @@ export default function TodosRoute() {
                 key={id}
                 id={id}
                 hidden={newTodoIdToDisplay !== id}
+                onSubmit={() => setNewTodoIds((ids) => [...ids, cuid()])}
               />
             ))}
           </header>
@@ -460,7 +464,15 @@ export default function TodosRoute() {
   );
 }
 
-function CreateInput({ id, hidden }: { id: string; hidden?: boolean }) {
+function CreateInput({
+  id,
+  hidden,
+  onSubmit,
+}: {
+  id: string;
+  hidden?: boolean;
+  onSubmit: () => void;
+}) {
   const createFetcher = useFetcher<typeof generalActions["createTodo"]>();
 
   const createFetcherData = createFetcher.data;
@@ -476,11 +488,12 @@ function CreateInput({ id, hidden }: { id: string; hidden?: boolean }) {
       method="post"
       className="create-form"
       hidden={hidden}
-      onSubmit={(e) =>
-        ((e.currentTarget.elements as any).createdAt.value = new Date()
+      onSubmit={(e) => {
+        (e.currentTarget.elements as any).createdAt.value = new Date()
           .toISOString()
-          .slice(0, -1))
-      }
+          .slice(0, -1);
+        onSubmit();
+      }}
     >
       <input type="hidden" name="intent" value="createTodo" />
       <input type="hidden" name="id" value={id} />
