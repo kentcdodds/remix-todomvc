@@ -52,18 +52,23 @@ test("Simple todo crud", async ({ page, baseURL }) => {
   await expect(markAsCompleteButton).not.toBeVisible();
   await expect(clearCompletedButton).not.toBeVisible();
   await expect(page.getByText(/item left/)).not.toBeVisible();
+  await expect(page.locator("ul.todo-list li")).toHaveCount(0);
 
   await newTodoInput.fill("Buy milk");
   await newTodoInput.press("Enter");
 
+  await expect(page.locator("ul.todo-list li")).toHaveCount(1);
   await expect(page.getByText("1 item left")).toBeVisible();
   await expect(markAsCompleteButton).toBeVisible();
   await expect(clearCompletedButton).not.toBeVisible();
 
   await page.getByRole("button", { name: "Mark as complete" }).click();
+  await expect(page.getByText("0 items left")).toBeVisible();
   await expect(clearCompletedButton).toBeVisible();
   await page.getByRole("button", { name: "Mark as incomplete" }).click();
   await page.getByRole("button", { name: "Delete todo" }).click();
+
+  await expect(page.locator("ul.todo-list li")).toHaveCount(0);
 });
 
 const testUserIds = new Set<string>();
